@@ -9,7 +9,6 @@ app.use(express.json());
 app.post("/signup", async (req, res) => {
     try {
         const { email, password } = req.body;
-
         const userCredential = await createUserWithEmailAndPassword(auth,email,password);
         res.status(201).send("User signed up successfully");
 
