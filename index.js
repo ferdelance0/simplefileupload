@@ -1,21 +1,33 @@
 const express = require("express");
-const firebase = require("./firebase"); // Import Firebase instance
-const {getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword} = require("firebase/auth");
-const auth = getAuth(firebase);
+const firebase = require("./firebase"); 
+const path = require("path");
+
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+const {getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword} = require("firebase/auth");
+const auth = getAuth(firebase);
+
+
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "/views"));
+app.use("/public", express.static("public"));
+
+
+app.get("/", (req, res) => {
+  res.render("login",{ errorMessage: null });
+});
 // Signup route
 app.post("/signup", async (req, res) => {
     try {
         const { email, password } = req.body;
         const userCredential = await createUserWithEmailAndPassword(auth,email,password);
-        res.status(201).send("User signed up successfully");
+        res.status(201).send(userCredential.user.uid);
 
     } catch (error) {
-        res.status(400).send(error.message);
+        res.render("login", { errorMessage: error.message });
     }
-
 });
 
 // Login route
@@ -23,9 +35,10 @@ app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     const userCredential = await signInWithEmailAndPassword(auth,email, password);
-    res.status(200).send("Login successful");
+    res.status(200).send(userCredential);
   } catch (error) {
-    res.status(400).send(error.message);
+
+    res.render("login", { errorMessage: error.message });
   }
 });
 
