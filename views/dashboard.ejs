@@ -45,7 +45,7 @@
                         class="fal fa-stream"></i></button>
             </div>
             <ul class="list-unstyled px-2">
-                <li class="active"><a href="#" class="text-decoration-none px-3 py-2 d-block"><i
+                <li class="active " id="dashboard-nav"><a href="#" class="text-decoration-none px-3 py-2 d-block"><i
                             class="fal fa-home"></i> Dashboard</a></li>
             <li class="" id="upload" ><a href="#" class="text-decoration-none px-3 py-2 d-block" ><i
                                 class="fal fa-home"></i> Add more files</a></li>
@@ -76,10 +76,7 @@
             </nav>
 
             <div class="dashboard-content px-3 pt-4">
-                    <form action="/store" method="post" enctype="multipart/form-data">
-                        <input type="file" name="filename">
-                        <button type="submit" class="btn btn-primary btn-block">submit</button>
-                    </form>
+                    
                     <div class="center">
                         <% if(querySnapshot.size > 0) { %>
                         <h2 class="fs-4"> <span class="text-black">Uploaded Files</span></h2>
@@ -98,12 +95,12 @@
                                         <td>
                                             <%= doc.id %>
                                         </td>
-
-                                        <td>
-                                            <%= doc.data().metadata.contentType %>
-                                        </td>
                                         <td>
                                             <%= doc.data().metadata.file_name %>
+                                           
+                                        </td>
+                                        <td>
+                                            <%= doc.data().metadata.contentType %>
                                         </td>
                                         <td><a href=<%=doc.data().downloadURL %>>Download</a> </td>
                                     </tr>

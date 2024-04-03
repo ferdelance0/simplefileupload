@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
+    const originalDashboardContent = document.querySelector('.dashboard-content').innerHTML;
     document.querySelectorAll('.sidebar ul li').forEach(item => {
         item.addEventListener('click', function () {
             document.querySelectorAll('.sidebar ul li.active').forEach(activeItem => {
@@ -10,14 +11,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.querySelector('.open-btn').addEventListener('click', function () {
         document.querySelector('.sidebar').classList.add('active');
+
     });
+
 
     document.querySelector('.close-btn').addEventListener('click', function () {
         document.querySelector('.sidebar').classList.remove('active');
     });
     document.querySelector('#upload').addEventListener('click', function () {
-        var myModal = new bootstrap.Modal(document.getElementsByClassName('exampleModal'));
-        myModal.show();
+        const dashboardContent = document.querySelector('.dashboard-content');
+        dashboardContent.innerHTML = `
+        <form action="/store" method="post" enctype="multipart/form-data">
+        <input type="file" name="filename">
+        <button type="submit" class="btn btn-primary btn-block">submit</button>
+        </form>`
+    })
+    document.querySelector('#dashboard-nav').addEventListener('click', function () {
+        const dashboardContent = document.querySelector('.dashboard-content');
+        dashboardContent.innerHTML = originalDashboardContent;
+
+
     })
 
 });
