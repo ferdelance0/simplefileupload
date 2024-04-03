@@ -1,4 +1,5 @@
-const firebase = require("firebase/app"); // only require firebase/app
+const firebase = require("firebase/app"); 
+const { getFirestore } = require("firebase/firestore");
 
 const firebaseConfig = {
     apiKey: "AIzaSyA1dVS7n0430QQt8G6IfSZ4p5YICTPJpT4",
