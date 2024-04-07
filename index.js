@@ -1,61 +1,38 @@
 const express = require("express");
 const session = require("express-session");
 const path = require("path");
+const cors = require("cors");
+
+const mutler = require("multer");
 const firebase = require("./firebase");
 const adminController = require("./controller/adminController");
+
+const { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
+const { getStorage, ref, getDownloadURL, uploadBytesResumable,deleteObject } = require("firebase/storage");
+const { getFirestore, collection, addDoc, query, getDocs,getDoc, deleteDoc, doc } = require("firebase/firestore");
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors());
 
-const { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
 const auth = getAuth(firebase);
-const { getStorage, ref, getDownloadURL, uploadBytesResumable } = require("firebase/storage");
 const storage = getStorage(firebase);
-
-const { getFirestore, collection, addDoc, query, where, getDocs } = require("firebase/firestore");
 const db = getFirestore();
-
-const mutler = require("multer");
 const upload = mutler({ storage: mutler.memoryStorage() });
-
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "/views"));
 app.use("/public", express.static("public"));
-app.use(session({
-  secret: 'As23e1213',
-  resave: false,
-  saveUninitialized: true
-}));
-
-app.get("/", (req, res) => {
-  res.render("login", { msg: null });
-});
-app.get("/dashboard", adminController.isAuthenticated, async (req, res) => {
-  try {
-    const { email, uid } = req.session.user;
-    const q = query(collection(db, uid));
-    const querySnapshot = await getDocs(q);
-    querySnapshot.forEach((doc) => {
-      console.log(doc.id, " => ", doc.data());
-    });
-
-    res.render("dashboard", { email, uid, querySnapshot });
-  } catch (error) {
-    console.log(error);
-  }
-});
-
 
 // Signup route
 app.post("/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    res.render("login", { msg: "" });
+    res.json({ status: "success" });
   } catch (error) {
-    res.render("login", { msg: adminController.extractErrorCode(error) });
+    res.json({ status: adminController.extractErrorCode(error) });
   }
 });
 
@@ -64,50 +41,126 @@ app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    req.session.user = { email, uid: userCredential.user.uid };
-    res.redirect("/dashboard")
-
+    res.json({ status: "success", email: email, uid: userCredential.user.uid });
   } catch (error) {
-    res.render("login", { msg: adminController.extractErrorCode(error) });
+    res.json({ status: adminController.extractErrorCode(error) });
   }
-});
-app.get("/logout", async(req, res) => {
-  try{
-    await auth.signOut();
-    req.session.destroy();
-    res.redirect("/")
-  }
-    catch(error) {
-      console.error("Error signing out:", error);
-      res.status(500).json({ success: false, message: "Logout failed" });
-    };
 });
 
+//dashboard route
+app.get("/dashboard", async (req, res) => {
+  try {
+    const { email, uid } = req.query;
+    const q = query(collection(db, uid));
+    const querySnapshot = await getDocs(q);
+    const documents = [];
+    querySnapshot.forEach((doc) => {
+      const docData = doc.data();
+      const docId = doc.id; 
+      docData.id = docId;
+      documents.push(docData);
+
+    });
+    res.json({ email, uid, documents });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+//logout route
+app.get("/logout", async (req, res) => {
+  try {
+    await auth.signOut();
+    res.json({ status: "success" });
+  } catch (error) {
+    console.error("Error signing out:", error);
+    res.json({ status: error });
+  }
+});
+
+//file upload route
 app.post("/store", upload.single("filename"), async (req, res) => {
   try {
-    console.log(req.session.user.uid);
-    const storageRef = ref(storage, `files/${req.file.originalname}`)
+    const uid = req.body.uid;
+    const storageRef = ref(storage, `files/${uid}/${req.file.originalname}`);
     const metadata = {
       contentType: req.file.mimetype,
-    }
+    };
     const snapshot = await uploadBytesResumable(storageRef, req.file.buffer, metadata);
     const downloadURL = await getDownloadURL(snapshot.ref);
-    id = req.session.user.uid;
-    const userDocRef = await addDoc(collection(db, id),
-      {
-        metadata: {
-          contentType: req.file.mimetype,
-          file_name: req.file.originalname
-        },
-        downloadURL: downloadURL,
-      });
-    console.log("done");
-    res.redirect("/dashboard");
+    const userDocRef = await addDoc(collection(db, uid), {
+      metadata: {
+        contentType: req.file.mimetype,
+        file_name: req.file.originalname,
+      },
+      downloadURL: downloadURL,
+    });
+    console.log("File uploaded successfully");
+    res.json({ status: "success" });
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    res.json({ status: error });
   }
-  catch (error) {
-    console.error(error);
+});
+
+//file delete route
+app.post("/delete", async (req, res) => {
+  const { fileId, uid } = req.body.params;
+
+  try {
+    const docRef = doc(db, uid, fileId);
+    const docSnapshot = await getDoc(docRef);
+    if (docSnapshot.exists()) {
+      const fileData = docSnapshot.data();
+      const fileName = fileData.metadata.file_name;
+
+      const storageRef = ref(storage, `files/${uid}/${fileName}`);
+      await deleteObject(storageRef);
+
+      await deleteDoc(docRef);
+
+      return res.json({ status: "success" });
+    } else {
+      return res.json({ status: "error", message: "Document not found" });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.json({ status: error });
   }
-})
+});
+
+//truncate table route
+app.post("/truncate", async (req, res) => {
+  const { uid } = req.body.params;
+  try {
+    const collectionRef = collection(db, uid);
+    const q = query(collectionRef);
+    const querySnapshot = await getDocs(q);
+
+    const deletePromises = [];
+    const storagePromises = [];
+
+    querySnapshot.forEach((doc) => {
+      const docId = doc.id;
+      const docData = doc.data();
+      const fileName = docData.metadata.file_name;
+
+      const deletePromise = deleteDoc(doc.ref);
+      deletePromises.push(deletePromise);
+
+      const storageRef = ref(storage, `files/${uid}/${fileName}`);
+      const storagePromise = deleteObject(storageRef);
+      storagePromises.push(storagePromise);
+    });
+    await Promise.all([...deletePromises, ...storagePromises]);
+    return res.json({ status: "success" });
+  } catch (error) {
+    console.log(error);
+    return res.json({ status: "error" });
+  }
+});
+
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
